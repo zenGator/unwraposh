@@ -6,6 +6,11 @@ param (
 [string]$infile
 )
 
+if($encodedBlob) {
+    $encodedBlob > zGtempUnwraposh
+    $infile=".\zGtempUnwraposh"
+}
+
 foreach($line in Get-Content $infile) {
 
 if ($infile) {
