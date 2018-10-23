@@ -80,4 +80,8 @@ $outstr=$outstr -replace " ",""
 Write-Output $outObj
 }
 
-remove-item ".\zGtempUnwraposh"
+if ($infile -eq ".\zGtempUnwraposh") {
+    # only necessary if no $infile at commandline
+    remove-item ".\zGtempUnwraposh"
+}
+
