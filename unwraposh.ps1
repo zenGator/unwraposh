@@ -17,77 +17,67 @@ if ($infile) {
 $encodedBlob=$line
 $c++
 Write-debug "`nscript #$c`n"
-$encbytecode=$b64dec=$str64dec=$matches=$deflated=$inflated=$outstr=$embedded= $x = $final = $null
+$encbytecode=$str64decoded=$matches=$deflated=$inflated=$outstr=$x=$final=$null
 }
 
 #start building an object 
-
      $outObj = New-Object -TypeName psobject    
-
      $outObj | Add-Member -MemberType NoteProperty -Name item  -value $c -PassThru |
              Add-Member -MemberType NoteProperty -Name startBlob -Value $encodedBlob -PassThru |
              Add-Member -MemberType NoteProperty -Name startLength -Value $encodedBlob.Length
 
-
-#Write-Host $encodedBlob
+#First we undo the base64 encoding
 try {
-    [Byte[]]$b64dec = [System.Convert]::FromBase64String($encodedBlob)
     $str64decoded=[System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String($encodedBlob))
+   # [Byte[]]$b64dec = [System.Convert]::FromBase64String($encodedBlob)  <== in case we need a byte stream
 } catch {
-    throw "does not seem to be base64"
-    exit
+    write-warning "does not seem to be base64"
 }
-
-#Write-Host "`nstr64decoded:`n"$str64decoded
-
 
 $x = $str64decoded -match '::FromBase64String\([''"](?<content>.*)[''"]'
 
-if  ($x) {
+if  ($x) {  #only change $encodedBlob (input) if it contains data marked as needing base64decode
     $encodedBlob=$matches['content']
 }
 else {
-    write-debug "there's not a base64-encoded-gzipped blob embedded"
-#    if ($encodedBlob.substring(0,4) -eq "H4sI") {write-host "strings equal";exit}
+    write-debug "there's not a base64-encoded blob embedded"
+# ToDo:  consider setting $encodedBlob to the output of the first decoding, $str64decoded 
+#    if ($encodedBlob.substring(0,4) -eq "H4sI") {write-host "probably base64-encoded gzipped data";exit}
 }
 
-try {
-    #Write-Host "`nencodedBlob`n"$encodedBlob
+try {  #we expect to be undoing base64(gzip(data)) here
     $deflated=New-Object IO.MemoryStream(,[Convert]::FromBase64String($encodedBlob))
     $inflated=(New-Object IO.StreamReader(New-Object IO.Compression.GzipStream($deflated,[IO.Compression.CompressionMode]::Decompress))).ReadToEnd()
 } catch {
     Write-debug "The encoded blob does not seem to derive from gzipped data"
 }
-#Write-Host "`ninflated:`n"$inflated
 
 $x = $inflated -match '::FromBase64String\([''"](?<content>.*)[''"]'
 if ($x) {
     $encbytecode=$matches['content']
 } else {
     write-debug "`nno additional embedded base64 code; this is as far as we got:`n $str64decoded "
+    # ToDo:  note ln44 & here we should use $encodedBlob
     }
 
-#add to the object
-     $outObj | Add-Member -MemberType NoteProperty -Name str64decoded  -value $str64decoded -PassThru |
-            Add-Member -MemberType NoteProperty -Name inflated  -value $inflated -PassThru |
-             Add-Member -MemberType NoteProperty -Name encodedbytecode -Value $encbytecode
+# add to the object
+     $outObj |  Add-Member -MemberType NoteProperty -Name str64decoded  -value $str64decoded -PassThru |
+                Add-Member -MemberType NoteProperty -Name inflated  -value $inflated -PassThru |
+                Add-Member -MemberType NoteProperty -Name encodedbytecode -Value $encbytecode
 
 #Write-debug "`nbase64-encoded bytecode: `n"$encbytecode
 $final = [System.Convert]::FromBase64String($encbytecode)
 $outStr="{0}" -f [string]($final | ForEach-Object ToString X2)
 $outstr=$outstr -replace " ",""
-#Write-debug "`ndecoded, as hex: `n" $outstr
+#Write-debug "`nbytecode, as hex: `n" $outstr
+# here's how to get an xxd-style hexdump
 #($final | Format-Hex  )
 
-
-
-#add to the object
-     $outObj | Add-Member -MemberType NoteProperty -Name decodedHex -Value $outstr -PassThru |
-             Add-Member -MemberType NoteProperty -Name final -Value $final -PassThru |
-             Add-Member -MemberType NoteProperty -Name endlength -Value $final.Length
-
+# add last bits to the object
+     $outObj |  Add-Member -MemberType NoteProperty -Name decodedHex -Value $outstr -PassThru |
+                Add-Member -MemberType NoteProperty -Name final -Value $final -PassThru |
+                Add-Member -MemberType NoteProperty -Name endlength -Value $final.Length
 Write-Output $outObj
 }
 
 remove-item ".\zGtempUnwraposh"
-
