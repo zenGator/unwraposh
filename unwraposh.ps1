@@ -1,4 +1,4 @@
-﻿#unwrapPoSh
+#unwrapPoSh
 #20181020:zG
 
 param (
@@ -88,4 +88,6 @@ $outstr=$outstr -replace " ",""
 
 Write-Output $outObj
 }
+
+remove-item ".\zGtempUnwraposh"
 
